@@ -17,7 +17,8 @@ class NikkeiSpider(scrapy.Spider):
                     "証券コード": code,
                     "銘柄名": name,
                     "日本経済新聞": f"https://www.nikkei.com/nkd/company/?scode={code}",
-                    "QUICK Money World": f"https://moneyworld.jp/stock/{code}"
+                    "QUICK Money World": f"https://moneyworld.jp/stock/{code}",
+                    "SBI証券": f"https://site3.sbisec.co.jp/ETGate/={code}"
                 }
 
         # 次のページへ（ページネーション）
