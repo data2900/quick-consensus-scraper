@@ -30,6 +30,10 @@ class NikkeiSpider(scrapy.Spider):
         self.cursor = self.conn.cursor()
         self.init_db()
 
+        # 取得件数カウンタ
+        self.total_seen = 0         # ページ上で見つけた件数
+        self.total_inserted = 0     # DBに新規登録できた件数
+
     def init_db(self):
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS consensus_url (
@@ -45,16 +49,24 @@ class NikkeiSpider(scrapy.Spider):
         self.conn.commit()
 
     def closed(self, reason):
+        # 統計を表示
+        msg = f"📦 取得件数: {self.total_seen} 件 / 新規登録: {self.total_inserted} 件（target_date={self.target_date}）"
+        self.logger.info(msg)
+        print(msg)
+
         # クローズ時にDB接続を閉じる
         self.conn.close()
 
     def parse(self, response):
+        # ページの行を取得（ヘッダー行は code/name が取れないのでスキップされる）
         rows = response.xpath('//table//tr')
         for row in rows:
             code = row.xpath('./td[1]/a/text()').get()
             name = row.xpath('./td[2]/a/text()').get()
 
             if code and name:
+                self.total_seen += 1
+
                 nikkei_url = f"https://www.nikkei.com/nkd/company/?scode={code}"
                 quick_url = f"https://moneyworld.jp/stock/{code}"
                 sbi_url = (
@@ -65,6 +77,7 @@ class NikkeiSpider(scrapy.Spider):
                     f"&ref_from=1&ref_to=20"
                 )
 
+                # 追加（INSERT OR IGNORE）し、rowcountで新規登録を判定
                 self.cursor.execute("""
                     INSERT OR IGNORE INTO consensus_url (
                         target_date, code, name, nikkeiurl, quickurl, sbiurl
@@ -72,6 +85,8 @@ class NikkeiSpider(scrapy.Spider):
                 """, (
                     self.target_date, code, name, nikkei_url, quick_url, sbi_url
                 ))
+                if self.cursor.rowcount == 1:
+                    self.total_inserted += 1
 
         self.conn.commit()
 
